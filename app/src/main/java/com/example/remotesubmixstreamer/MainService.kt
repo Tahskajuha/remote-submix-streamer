@@ -2,12 +2,16 @@ package com.example.remotesubmixstreamer
 
 import android.media.*
 import kotlin.concurrent.thread
+import kotlinx.coroutines.flow.MutableStateFlow
 import android.app.Service
 import android.util.Log
 import android.content.Intent
 import android.os.IBinder
 
 class StreamerService : Service() {
+	companion object {
+		val isRunningFlow = MutableStateFlow(false)
+	}
 	override fun onBind(intent: Intent?): IBinder? = null
 	override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 		val prefs = getSharedPreferences("config", MODE_PRIVATE)
@@ -28,12 +32,16 @@ class StreamerService : Service() {
 			finalPort = prefs.getInt("port", -1)
 		} else {
 			Log.e("StreamerService", "No valid configuration found. Stopping service.")
-			prefs.edit().putBoolean("is_running", false).apply()
+			isRunningFlow.value = false
 			stopSelf()
 			return START_NOT_STICKY
 		}
 		Log.d("StreamerService", "Using data: $finalIp:$finalPort")
-		prefs.edit().putBoolean("is_running", true).apply()
+		isRunningFlow.value = true
 		return START_STICKY
+	}
+	override fun onDestroy() {
+		super.onDestroy()
+		isRunningFlow.value = false
 	}
 }

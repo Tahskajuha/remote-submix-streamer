@@ -1,6 +1,7 @@
 package com.example.remotesubmixstreamer
 
 import android.os.Bundle
+import androidx.compose.ui.platform.LocalContext
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.*
@@ -27,7 +28,8 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(prefs: android.content.SharedPreferences) {
 	var ip by remember { mutableStateOf("") }
 	var portString by remember { mutableStateOf("") }
-	var checked by remember { mutableStateOf(false) }
+	val isRunning by StreamerService.isRunningFlow.collectAsState()
+	val context = LocalContext.current
 	val port = portString.toIntOrNull() ?: 0
 
 	val Crust = Color(0xFF11111B)
@@ -58,9 +60,17 @@ fun MainScreen(prefs: android.content.SharedPreferences) {
 				style = MaterialTheme.typography.titleLarge
 			)
 			Switch(
-				checked = checked,
-				onCheckedChange = {
-					checked = it
+				checked = isRunning,
+				onCheckedChange = { enabled ->
+					if (enabled) {
+						val intent = Intent(context, StreamerService::class.java).apply {
+							putExtra("ip", ip)
+							putExtra("port", port)
+						}
+						context.startService(intent)
+					} else {
+						context.stopService(Intent(context, StreamerService::class.java))
+					}
 				},
 				colors = SwitchDefaults.colors(
 					checkedThumbColor = Sky,
