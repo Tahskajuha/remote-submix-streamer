@@ -1,71 +1,141 @@
 package com.example.remotesubmixstreamer
 
-import android.media.*
 import android.os.Bundle
-import android.util.Log
-import androidx.appcompat.app.AppCompatActivity
-import kotlin.concurrent.thread
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import android.content.Intent
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
+	override fun onCreate(savedInstanceState: Bundle?) {
+		super.onCreate(savedInstanceState)
+		val prefs = getSharedPreferences("config", MODE_PRIVATE);
+		setContent {
+			MainScreen(prefs)
+		}
+	}
+}
 
-    private val TAG = "SubmixTest"
+@Composable
+fun MainScreen(prefs: android.content.SharedPreferences) {
+	var ip by remember { mutableStateOf("") }
+	var portString by remember { mutableStateOf("") }
+	var checked by remember { mutableStateOf(false) }
+	val port = portString.toIntOrNull() ?: 0
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+	val Crust = Color(0xFF11111B)
+	val Base = Color(0xFF1E1E2E)
+	val Surface0 = Color(0xFF313244)
+	val Surface1 = Color(0xFF45475A)
+	val HalfSurface1 = Color(0x8045475A)
+	val TextColor = Color(0xFFCDD6F4)
+	val Subtext0 = Color(0xFFA6ADC8)
+	val Sky = Color(0xFF89DCEB)
+	val HalfSky = Color(0x8089DCEB)
 
-        Log.d(TAG, "Starting AudioRecord test...")
+	Column(
+		modifier = Modifier
+			.fillMaxSize()
+			.background(Color(0xFF11111B))
+			.padding(16.dp)
+	) {
+		Row(
+			modifier = Modifier
+				.fillMaxWidth(),
+			horizontalArrangement = Arrangement.SpaceBetween,
+			verticalAlignment = Alignment.CenterVertically
+		) {
+			Text(
+				"RemoteSubmixStreamer",
+				color = TextColor,
+				style = MaterialTheme.typography.titleLarge
+			)
+			Switch(
+				checked = checked,
+				onCheckedChange = {
+					checked = it
+				},
+				colors = SwitchDefaults.colors(
+					checkedThumbColor = Sky,
+					checkedTrackColor = HalfSky,
+					uncheckedThumbColor = Surface1,
+					uncheckedTrackColor = HalfSurface1,
+					checkedBorderColor = Sky,
+					uncheckedBorderColor = Surface1
+				)
+			)
+		}
 
-        val sampleRate = 48000
-        val channelConfig = AudioFormat.CHANNEL_IN_STEREO
-        val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+		Spacer(
+			modifier = Modifier
+				.weight(1f)
+		)
 
-        val bufferSize = AudioRecord.getMinBufferSize(
-            sampleRate,
-            channelConfig,
-            audioFormat
-        )
+		Row(
+			modifier = Modifier
+				.fillMaxWidth()
+		) {
+			OutlinedTextField(
+				value = ip,
+				onValueChange = { ip = it },
+				placeholder = { Text("Target Device's IP") },
+				singleLine = true,
+				modifier = Modifier
+					.weight(3f),
+				colors = OutlinedTextFieldDefaults.colors(
+					focusedBorderColor = Sky,
+					unfocusedBorderColor = Surface1,
+					focusedTextColor = TextColor,
+					unfocusedTextColor = TextColor,
+					cursorColor = Sky,
+					focusedLabelColor = Sky,
+					unfocusedLabelColor = Subtext0,
+					focusedPlaceholderColor = Subtext0,
+					unfocusedPlaceholderColor = Subtext0,
+					focusedContainerColor = Surface0,
+					unfocusedContainerColor = Surface0
+				),
+				textStyle = MaterialTheme.typography.bodyLarge
+			)
 
-        val audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.REMOTE_SUBMIX,
-            sampleRate,
-            channelConfig,
-            audioFormat,
-            bufferSize * 2
-        )
+			Spacer(
+				modifier = Modifier
+					.width(12.dp)
+			)
 
-        if (audioRecord.state != AudioRecord.STATE_INITIALIZED) {
-            Log.e(TAG, "AudioRecord init FAILED")
-            return
-        }
-
-        audioRecord.startRecording()
-        Log.d(TAG, "Recording started")
-
-        thread {
-            val buffer = ByteArray(bufferSize)
-
-            while (true) {
-                val read = audioRecord.read(buffer, 0, buffer.size)
-
-                if (read > 0) {
-                    // Check if buffer has non-zero data
-                    var nonZero = false
-                    for (i in 0 until read) {
-                        if (buffer[i].toInt() != 0) {
-                            nonZero = true
-                            break
-                        }
-                    }
-
-                    if (nonZero) {
-                        Log.d(TAG, "🔥 AUDIO DATA FLOWING ($read bytes)")
-                    } else {
-                        Log.d(TAG, "…silence ($read bytes)")
-                    }
-                } else {
-                    Log.e(TAG, "Read failed: $read")
-                }
-            }
-        }
-    }
+			OutlinedTextField(
+				value = portString,
+				onValueChange = { newPortString ->
+					if (newPortString.isEmpty() || newPortString.all { it.isDigit() }) {
+						portString = newPortString
+					}
+				},
+				placeholder = { Text("Target Port") },
+				singleLine = true,
+				modifier = Modifier
+					.weight(1f),
+				colors = OutlinedTextFieldDefaults.colors(
+					focusedBorderColor = Sky,
+					unfocusedBorderColor = Surface1,
+					focusedTextColor = TextColor,
+					unfocusedTextColor = TextColor,
+					cursorColor = Sky,
+					focusedLabelColor = Sky,
+					unfocusedLabelColor = Subtext0,
+					focusedPlaceholderColor = Subtext0,
+					unfocusedPlaceholderColor = Subtext0,
+					focusedContainerColor = Surface0,
+					unfocusedContainerColor = Surface0
+				),
+				textStyle = MaterialTheme.typography.bodyLarge
+			)
+		}
+	}
 }
