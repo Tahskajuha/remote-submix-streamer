@@ -13,7 +13,7 @@ android {
 
   defaultConfig {
     applicationId = packageName
-    minSdk = 24
+    minSdk = 26
     targetSdk = 36
     versionCode = 1
     versionName = "1.0"
@@ -49,4 +49,5 @@ dependencies {
   implementation("androidx.compose.material3:material3")
   implementation("androidx.activity:activity-compose")
   implementation("androidx.appcompat:appcompat:1.7.1")
+  implementation("eu.buney.kopus:kopus-full:1.6.1.2")
 }
