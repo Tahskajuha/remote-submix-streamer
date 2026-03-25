@@ -26,8 +26,14 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainScreen(prefs: android.content.SharedPreferences) {
-	var ip by remember { mutableStateOf("") }
-	var portString by remember { mutableStateOf("") }
+	var ip by remember {
+		mutableStateOf(prefs.getString("ip", "") ?: "")
+	}
+	var portString by remember {
+		mutableStateOf(prefs.getInt("port", 0).takeIf {
+			it != 0
+		}?.toString() ?: "")
+	}
 	val isRunning by StreamerService.isRunningFlow.collectAsState()
 	val context = LocalContext.current
 	val port = portString.toIntOrNull() ?: 0

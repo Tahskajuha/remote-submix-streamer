@@ -23,19 +23,19 @@ class StreamerService : Service() {
 		val prefs = getSharedPreferences("config", MODE_PRIVATE)
 
 		val ip = intent?.getStringExtra("ip")
-		val port = intent?.getIntExtra("port", -1) ?: -1
+		val port = intent?.getIntExtra("port", 0) ?: 0
 
 		val finalIp: String?
 		val finalPort: Int
 
-		if (ip != null && port != -1) {
+		if (!ip.isNullOrBlank() && port != 0) {
 			finalIp = ip
 			finalPort = port
 
 			prefs.edit().putString("ip", ip).putInt("port", port).apply()
-		} else if (prefs.getString("ip", null) != null && prefs.getInt("port", -1) != -1){
+		} else if (prefs.getString("ip", null) != null && prefs.getInt("port", 0) != 0){
 			finalIp = prefs.getString("ip", null)
-			finalPort = prefs.getInt("port", -1)
+			finalPort = prefs.getInt("port", 0)
 		} else {
 			Log.e("StreamerService", "No valid configuration found. Stopping service.")
 			stopSelf()
