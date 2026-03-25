@@ -8,12 +8,41 @@ import android.app.Service
 import android.util.Log
 import android.content.Intent
 import android.os.IBinder
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.pm.ServiceInfo
+import java.net.DatagramSocket
+import java.net.DatagramPacket
+import java.net.InetAddress
 
 class StreamerService : Service() {
 	companion object {
 		@Volatile private var running = false
 		val isRunningFlow = MutableStateFlow(false)
 	}
+
+	private fun createNotificationChannel() {
+		val channel = NotificationChannel(
+			"streamer_channel",
+			"Streaming Service",
+			NotificationManager.IMPORTANCE_LOW
+		)
+		val manager = getSystemService(NotificationManager::class.java)
+
+		manager.createNotificationChannel(channel)
+	}
+
+	private fun buildNotification(): Notification {
+		return Notification
+			.Builder(this, "streamer_channel")
+			.setContentTitle("Remote Submix Streaming")
+			.setContentText("Streaming audio output")
+			.setSmallIcon(android.R.drawable.ic_media_play)
+			.setOngoing(true)
+			.build()
+	}
+
 	override fun onBind(intent: Intent?): IBinder? = null
 	override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 		if (running) {
@@ -72,26 +101,24 @@ class StreamerService : Service() {
 		isRunningFlow.value = true
 		running = true
 
-		thread {
-			rsubmixListener.startRecording()
-			while (running) {
-				val read = rsubmixListener.read(pcmBuffer, 0, pcmBuffer.size)
-				var sum = 0
-				if (read == pcmBuffer.size) {
-					for (i in pcmBuffer) {
-						sum += kotlin.math.abs(i.toInt())
-					}
-					Log.d("StreamerService", "PCM energy: $sum")
-					val encoded = encoder.encode(pcmBuffer.copyOf(read))
-					Log.d("StreamerService", "${encoded.size}")
-				} else {
-					Log.d("StreamerService", "Read failed")
-				}
-			}
-			rsubmixListener.stop()
-			rsubmixListener.release()
+		createNotificationChannel()
+		startForeground(1, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
 
-			isRunningFlow.value = false
+		thread {
+			try {
+				rsubmixListener.startRecording()
+				while (running) {
+					val read = rsubmixListener.read(pcmBuffer, 0, pcmBuffer.size)
+					if (read != pcmBuffer.size) {
+						Log.d("StreamerService", "Read failed")
+					}
+					val encoded = encoder.encode(pcmBuffer.copyOf(read))
+				}
+			} finally {
+				rsubmixListener.stop()
+				rsubmixListener.release()
+				isRunningFlow.value = false
+			}
 		}
 
 		return START_STICKY
@@ -99,5 +126,6 @@ class StreamerService : Service() {
 	override fun onDestroy() {
 		super.onDestroy()
 		running = false
+		stopForeground(STOP_FOREGROUND_REMOVE)
 	}
 }

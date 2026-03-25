@@ -3,6 +3,10 @@ package com.example.remotesubmixstreamer
 import android.os.Bundle
 import androidx.compose.ui.platform.LocalContext
 import androidx.activity.ComponentActivity
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
 import androidx.activity.compose.setContent
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,6 +41,16 @@ fun MainScreen(prefs: android.content.SharedPreferences) {
 	val isRunning by StreamerService.isRunningFlow.collectAsState()
 	val context = LocalContext.current
 	val port = portString.toIntOrNull() ?: 0
+
+	LaunchedEffect(Unit) {
+		if (context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+			ActivityCompat.requestPermissions(
+				context as ComponentActivity,
+				arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+				100
+			)
+		}
+	}
 
 	val Crust = Color(0xFF11111B)
 	val Base = Color(0xFF1E1E2E)
@@ -73,7 +87,7 @@ fun MainScreen(prefs: android.content.SharedPreferences) {
 							putExtra("ip", ip)
 							putExtra("port", port)
 						}
-						context.startService(intent)
+						context.startForegroundService(intent)
 					} else {
 						context.stopService(Intent(context, StreamerService::class.java))
 					}
