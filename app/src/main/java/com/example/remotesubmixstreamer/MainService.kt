@@ -16,6 +16,41 @@ import java.net.DatagramSocket
 import java.net.DatagramPacket
 import java.net.InetAddress
 
+data class RtpPacket(
+	val sequenceNumber: Int,
+	val timestamp: Int,
+	val ssrc: Int,
+	val payloadType: Int,
+	val payload: ByteArray
+) {
+	fun toByteArray(): ByteArray {
+		val buffer = ByteArray(12 + payload.size)
+
+		// version 2, no padding, no header extension
+		buffer[0] = 0x80.toByte()
+
+		val marker = 0
+		buffer[1] = ((marker shl 7) or (payloadType and 0x7F)).toByte()
+
+		buffer[2] = (sequenceNumber shr 8).toByte()
+		buffer[3] = (sequenceNumber and 0xFF).toByte()
+
+		buffer[4] = ((timestamp shr 24) and 0xFF).toByte()
+		buffer[5] = ((timestamp shr 16) and 0xFF).toByte()
+		buffer[6] = ((timestamp shr 8) and 0xFF).toByte()
+		buffer[7] = (timestamp and 0xFF).toByte()
+
+		buffer[8] = ((ssrc shr 24) and 0xFF).toByte()
+		buffer[9] = ((ssrc shr 16) and 0xFF).toByte()
+		buffer[10] = ((ssrc shr 8) and 0xFF).toByte()
+		buffer[11] = (ssrc and 0xFF).toByte()
+
+		System.arraycopy(payload, 0, buffer, 12, payload.size)
+
+		return buffer
+	}
+}
+
 class StreamerService : Service() {
 	companion object {
 		@Volatile private var running = false
@@ -77,6 +112,7 @@ class StreamerService : Service() {
 		val audioFormat = AudioFormat.ENCODING_PCM_16BIT
 		val frameSize = 960
 		val pcmBuffer = ShortArray(frameSize * channels)
+		val outputBuffer = ByteArray(1024)
 
 		val rsubmixListener = AudioRecord(
 			MediaRecorder.AudioSource.REMOTE_SUBMIX,
@@ -104,6 +140,13 @@ class StreamerService : Service() {
 		createNotificationChannel()
 		startForeground(1, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
 
+		var seq = 0
+		var timestamp = 0
+		val ssrc = (0..Int.MAX_VALUE).random()
+
+		val socket = DatagramSocket()
+		val address = InetAddress.getByName(finalIp!!)
+
 		thread {
 			try {
 				rsubmixListener.startRecording()
@@ -111,10 +154,36 @@ class StreamerService : Service() {
 					val read = rsubmixListener.read(pcmBuffer, 0, pcmBuffer.size)
 					if (read != pcmBuffer.size) {
 						Log.d("StreamerService", "Read failed")
+						continue
 					}
-					val encoded = encoder.encode(pcmBuffer.copyOf(read))
+					val encoded = encoder.encode(
+						pcmBuffer,
+						0,
+						frameSize,
+						outputBuffer,
+						0,
+						outputBuffer.size
+					)
+					if (encoded <= 0) continue
+
+					val payload = outputBuffer.copyOf(encoded)
+					val packet = RtpPacket(
+						sequenceNumber = seq,
+						timestamp = timestamp,
+						ssrc = ssrc,
+						payloadType = 96,
+						payload = payload
+					)
+					val bytes = packet.toByteArray()
+
+					socket.send(
+						DatagramPacket(bytes, bytes.size, address, finalPort)
+					)
+					seq = (seq + 1) and 0xFFFF
+					timestamp += frameSize
 				}
 			} finally {
+				socket.close()
 				rsubmixListener.stop()
 				rsubmixListener.release()
 				isRunningFlow.value = false
